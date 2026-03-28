@@ -64,7 +64,8 @@
         <h4>横浜市営バス21系統</h4>
         <p class="price">💰 220円 / ⏱️ 15分</p>
         <p style="font-size:12px; color:#666;">※滝の上から平坦道</p>
-        <button class="btn-select btn-green" onclick="simulateRoute('warp')">賢くワープする</button>
+        <button onclick="calculateAndDisplayRoute('training')" style="...">修行ルート</button>
+<button onclick="calculateAndDisplayRoute('warp')" style="...">神ワープ</button>
     </div>
 </div>
 
@@ -72,59 +73,86 @@
 
 <script>
     let map;
-let originAutocomplete;      // ★出発地用
-let destinationAutocomplete; // ★目的地用
+let directionsService;
+let directionsRenderer;
+let originAutocomplete;
+let destinationAutocomplete;
 
 function initMap() {
+    // 1. 地図の初期化
     map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: 35.435, lng: 139.645 },
         zoom: 15,
         disableDefaultUI: true
     });
 
-    // --- 出発地の設定 ---
+    // 2. ルート描画の準備
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer();
+    directionsRenderer.setMap(map); // 地図と紐付け
+
+    // 3. 検索窓（出発地）
     const originInput = document.getElementById("origin-input");
     originAutocomplete = new google.maps.places.Autocomplete(originInput);
     originAutocomplete.addListener("place_changed", () => {
         const place = originAutocomplete.getPlace();
         if (!place.geometry) return;
-        window.selectedOrigin = place.geometry.location; // 出発地を保存
-        map.setCenter(place.geometry.location);
+        window.selectedOrigin = place.geometry.location;
     });
 
-    // --- 目的地の設定 ---
+    // 4. 検索窓（目的地）
     const destInput = document.getElementById("destination-input");
     destinationAutocomplete = new google.maps.places.Autocomplete(destInput);
     destinationAutocomplete.addListener("place_changed", () => {
         const place = destinationAutocomplete.getPlace();
         if (!place.geometry) return;
-        window.selectedDestination = place.geometry.location; // 目的地を保存
-        map.setCenter(place.geometry.location);
+        window.selectedDestination = place.geometry.location;
     });
 }
 
-function simulateRoute(type) {
-    // 両方入力されているかチェック
+// ★ここが重要：ルートを実際に引く関数
+function calculateAndDisplayRoute(type) {
     if (!window.selectedOrigin || !window.selectedDestination) {
-        alert("出発地と目的地の両方を選んでください！");
+        alert("出発地と目的地を選択してください");
         return;
     }
 
+    directionsService.route(
+        {
+            origin: window.selectedOrigin,
+            destination: window.selectedDestination,
+            travelMode: google.maps.TravelMode.WALKING // 徒歩モード
+        },
+        (response, status) => {
+            if (status === "OK") {
+                // 地図にルートを描画
+                directionsRenderer.setDirections(response);
+                
+                // HP減少の演出を開始
+                updateHPStatus(type);
+            } else {
+                alert("ルートが見つかりませんでした: " + status);
+            }
+        }
+    );
+}
+
+function updateHPStatus(type) {
     const hpFill = document.getElementById("hp-bar-fill");
     const hpText = document.getElementById("hp-text");
     
     hpFill.style.width = "100%";
-    hpText.innerText = "ルートの高低差を解析中...";
+    hpText.innerText = "勾配を計算中...";
 
     setTimeout(() => {
         if (type === 'training') {
-            hpFill.style.width = "10%";
+            hpFill.style.width = "20%";
             hpFill.style.background = "#ef4444";
-            hpText.innerText = "この修行ルートはキツいです！残りHP: 10";
+            hpText.innerText = "修行ルート：到着時のHP 20";
         } else {
-            hpFill.style.width = "85%";
+            hpFill.style.width = "80%";
             hpFill.style.background = "#10b981";
-            hpText.innerText = "坂を回避しました！残りHP: 85";
+            hpText.innerText = "神ワープ：到着時のHP 80";
         }
     }, 1000);
 }
