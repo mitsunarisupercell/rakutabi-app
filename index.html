@@ -1,3 +1,143 @@
-{
-	"folders": []
-}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>楽旅ナビ - 比較シミュレーター</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f0fdf4; padding-bottom: 50px; }
+        #header { background: linear-gradient(135deg, #2563eb, #10b981); color: white; padding: 15px; text-align: center; sticky: top; }
+        
+        /* HPゲージのデザイン */
+        #hp-container { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 10px; margin-top: 10px; }
+        #hp-bar-bg { background-color: #eee; border-radius: 8px; height: 20px; width: 100%; position: relative; overflow: hidden; }
+        #hp-bar-fill { background: #10b981; height: 100%; width: 100%; transition: width 1.5s cubic-bezier(0.1, 0, 0.3, 1); }
+        #hp-text { position: absolute; width: 100%; text-align: center; top: 0; font-weight: bold; line-height: 20px; font-size: 12px; }
+
+        #map { height: 300px; width: 100%; border-bottom: 2px solid #ccc; }
+        
+        /* 比較カードのスタイル */
+        .comparison-container { display: flex; gap: 10px; padding: 15px; overflow-x: auto; }
+        .route-card { background: white; border-radius: 15px; padding: 15px; min-width: 200px; flex: 1; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 2px solid transparent; transition: 0.3s; }
+        .route-card.training { border-color: #ef4444; } /* 修行：赤 */
+        .route-card.warp { border-color: #10b981; }     /* ワープ：緑 */
+        
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: bold; margin-bottom: 8px; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-green { background: #d1fae5; color: #065f46; }
+
+        h4 { margin: 5px 0; font-size: 16px; }
+        .price { font-size: 14px; color: #666; }
+        .btn-select { width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; }
+        .btn-red { background: #ef4444; }
+        .btn-green { background: #10b981; }
+    </style>
+</head>
+<<body>
+    <div id="header">
+    </div>
+
+<div id="map"></div>
+
+<div style="padding: 15px; background: white; margin: 10px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; z-index: 1000;">
+    <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 14px; color: #333;">📍 目的地を入力</p>
+    <input id="destination-input" type="text" placeholder="例：横浜スタジアム" 
+           style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px;">
+</div>
+        <div id="header">
+            </div>
+    
+        <div id="map"></div>
+    
+        <div style="padding: 15px; background: white; margin: 10px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; z-index: 1000;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 14px; color: #333;">📍 目的地を入力</p>
+            <input id="destination-input" type="text" placeholder="例：横浜スタジアム" 
+                   style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px;">
+        </div>    
+<div id="header">
+    <h2 style="margin:0;">楽旅ナビ 🗺️</h2>
+    <div id="hp-container">
+        <div id="hp-bar-bg">
+            <div id="hp-bar-fill"></div>
+            <div id="hp-text">現在地での体力: 100 / 100</div>
+        </div>
+    </div>
+</div>
+
+<div id="map"></div>
+<div style="padding: 15px; background: white; margin: 10px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+    <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 14px;">📍 目的地を入力</p>
+    <input id="destination-input" type="text" placeholder="例：フェリス女学院" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box;">
+</div>
+
+    <div class="route-card warp">
+        <span class="badge badge-green">神ワープ</span>
+        <h4>横浜市営バス21系統</h4>
+        <p class="price">💰 220円 / ⏱️ 15分</p>
+        <p style="font-size:12px; color:#666;">※滝の上から平坦道</p>
+        <button class="btn-select btn-green" onclick="simulateRoute('warp')">賢くワープする</button>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=routes,elevation&callback=initMap" async defer></script>
+
+<script>
+    let map;
+    let autocomplete; // ★追加：検索候補用
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 35.435, lng: 139.645 },
+            zoom: 15,
+            disableDefaultUI: true
+        });
+
+        // ★ここから追加：自動補完の設定
+        const input = document.getElementById("destination-input");
+        autocomplete = new google.maps.places.Autocomplete(input);
+        
+        // 場所が選ばれた時の動き
+        autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry) return;
+
+            // 地図を選択した場所に移動
+            map.setCenter(place.geometry.location);
+            map.setZoom(17);
+            
+            // 選択した場所を記録しておく
+            window.selectedDestination = place.geometry.location;
+        });
+        // ★ここまで追加★
+    }
+
+    function simulateRoute(type) {
+        // ★ここから追加：目的地チェック
+        if (!window.selectedDestination) {
+            alert("先に上の入力欄で目的地を選んでください！");
+            return;
+        }
+        // ★ここまで追加★
+
+        const hpFill = document.getElementById("hp-bar-fill");
+        const hpText = document.getElementById("hp-text");
+        
+        hpFill.style.width = "100%";
+        hpText.innerText = "計算中...";
+
+        setTimeout(() => {
+            if (type === 'training') {
+                hpFill.style.width = "15%";
+                hpFill.style.background = "#ef4444";
+                hpText.innerText = "到着時の予想HP: 15 / 100";
+            } else {
+                hpFill.style.width = "90%";
+                hpFill.style.background = "#10b981";
+                hpText.innerText = "到着時の予想HP: 90 / 100";
+            }
+        }, 800);
+    }
+</script>
+
+</body>
+</html>
