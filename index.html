@@ -72,46 +72,7 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=places&callback=initMap" async defer></script>
 
 <script>
-    let map;
-let directionsService;
-let directionsRenderer;
-let originAutocomplete;
-let destinationAutocomplete;
-
-function initMap() {
-    // 1. 地図の初期化
-    map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 35.435, lng: 139.645 },
-        zoom: 15,
-        disableDefaultUI: true
-    });
-
-    // 2. ルート描画の準備
-    directionsService = new google.maps.DirectionsService();
-    directionsRenderer = new google.maps.DirectionsRenderer();
-    directionsRenderer.setMap(map); // 地図と紐付け
-
-    // 3. 検索窓（出発地）
-    const originInput = document.getElementById("origin-input");
-    originAutocomplete = new google.maps.places.Autocomplete(originInput);
-    originAutocomplete.addListener("place_changed", () => {
-        const place = originAutocomplete.getPlace();
-        if (!place.geometry) return;
-        window.selectedOrigin = place.geometry.location;
-    });
-
-    // 4. 検索窓（目的地）
-    const destInput = document.getElementById("destination-input");
-    destinationAutocomplete = new google.maps.places.Autocomplete(destInput);
-    destinationAutocomplete.addListener("place_changed", () => {
-        const place = destinationAutocomplete.getPlace();
-        if (!place.geometry) return;
-        window.selectedDestination = place.geometry.location;
-    });
-}
-
-// ★ここが重要：ルートを実際に引く関数
-function calculateAndDisplayRoute(type) {
+  function calculateAndDisplayRoute(type) {
     if (!window.selectedOrigin || !window.selectedDestination) {
         alert("出発地と目的地を選択してください");
         return;
@@ -121,40 +82,61 @@ function calculateAndDisplayRoute(type) {
         {
             origin: window.selectedOrigin,
             destination: window.selectedDestination,
-            travelMode: google.maps.TravelMode.WALKING // 徒歩モード
+            travelMode: google.maps.TravelMode.WALKING
         },
         (response, status) => {
             if (status === "OK") {
-                // 地図にルートを描画
                 directionsRenderer.setDirections(response);
                 
-                // HP減少の演出を開始
-                updateHPStatus(type);
-            } else {
-                alert("ルートが見つかりませんでした: " + status);
+                // ★ここから追加：標高（高さ）を調べる
+                const path = response.routes[0].overview_path;
+                const elevator = new google.maps.ElevationService();
+
+                elevator.getElevationForLocations({
+                    locations: path
+                }, (results, status) => {
+                    if (status === "OK") {
+                        // ルート内の「登り坂」の合計を計算する
+                        let totalAscent = 0;
+                        for (let i = 1; i < results.length; i++) {
+                            const diff = results[i].elevation - results[i-1].elevation;
+                            if (diff > 0) totalAscent += diff; // 上がった分だけ足す
+                        }
+                        
+                        // 標高データをもとにHPを減らす
+                        applyRealHPDamage(totalAscent, type);
+                    }
+                });
             }
         }
     );
 }
 
-function updateHPStatus(type) {
+// 実際のダメージを計算して表示する関数
+function applyRealHPDamage(ascent, type) {
     const hpFill = document.getElementById("hp-bar-fill");
     const hpText = document.getElementById("hp-text");
     
-    hpFill.style.width = "100%";
-    hpText.innerText = "勾配を計算中...";
+    // 基本のダメージ（距離など） + 坂道のボーナスダメージ
+    let damage = Math.floor(ascent * 5); // 1m登るごとに5ダメージ（調整可）
+    
+    // 「神ワープ」ならダメージを半分にする（仮のロジック）
+    if (type === 'warp') {
+        damage = Math.floor(damage * 0.3); 
+    }
 
-    setTimeout(() => {
-        if (type === 'training') {
-            hpFill.style.width = "20%";
-            hpFill.style.background = "#ef4444";
-            hpText.innerText = "修行ルート：到着時のHP 20";
-        } else {
-            hpFill.style.width = "80%";
-            hpFill.style.background = "#10b981";
-            hpText.innerText = "神ワープ：到着時のHP 80";
-        }
-    }, 1000);
+    let remainingHP = 100 - damage;
+    if (remainingHP < 0) remainingHP = 0;
+
+    // アニメーションで反映
+    hpFill.style.width = remainingHP + "%";
+    hpText.innerText = `合計登り: ${Math.round(ascent)}m / 到着時のHP: ${remainingHP}`;
+    
+    if (remainingHP < 30) {
+        hpFill.style.background = "#ef4444"; // ピンチなら赤
+    } else {
+        hpFill.style.background = "#10b981"; // 元気なら緑
+    }
 }
 </script>
 
