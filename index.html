@@ -12,6 +12,25 @@
         .input-container {
             padding: 15px; background: white; margin: 10px; border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; z-index: 1000;
+			<div style="display: flex; justify-content: space-around; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+    <label style="text-align: center; cursor: pointer;">
+        <input type="radio" name="travel-mode" value="WALKING" checked style="display: none;">
+        <div class="mode-icon" onclick="selectMode(this, 'WALKING')">🚶‍♂️<br><span style="font-size: 10px;">徒歩</span></div>
+    </label>
+    <label style="text-align: center; cursor: pointer;">
+        <input type="radio" name="travel-mode" value="TRANSIT" style="display: none;">
+        <div class="mode-icon" onclick="selectMode(this, 'TRANSIT')" style="opacity: 0.5;">🚃<br><span style="font-size: 10px;">電車</span></div>
+    </label>
+    <label style="text-align: center; cursor: pointer;">
+        <input type="radio" name="travel-mode" value="DRIVING" style="display: none;">
+        <div class="mode-icon" onclick="selectMode(this, 'DRIVING')" style="opacity: 0.5;">🚗<br><span style="font-size: 10px;">車</span></div>
+    </label>
+</div>
+
+<style>
+    .mode-icon { padding: 5px 10px; border-radius: 8px; transition: all 0.3s; }
+    .mode-active { background: #e0f2fe; border: 1px solid #4a90e2; opacity: 1 !important; transform: scale(1.1); }
+</style>
         }
         .input-group { margin-bottom: 12px; }
         .input-group label { display: block; font-size: 12px; font-weight: bold; color: #666; margin-bottom: 4px; }
@@ -67,7 +86,69 @@
     </div>
 
     <script>
-        let map, directionsService, directionsRenderer, originAutocomplete, destinationAutocomplete;
+     // スクリプトの最初の方に追加
+let currentTravelMode = 'WALKING';
+
+// アイコンを選択した時の見た目の切り替え
+function selectMode(element, mode) {
+    document.querySelectorAll('.mode-icon').forEach(el => el.classList.remove('mode-active'));
+    element.classList.add('mode-active');
+    currentTravelMode = mode;
+}
+
+// calculateAndDisplayRoute関数の中を修正
+function calculateAndDisplayRoute(type) {
+    if (!window.selectedOrigin || !window.selectedDestination) {
+        alert("出発地と目的地を選択してください");
+        return;
+    }
+
+    directionsService.route({
+        origin: window.selectedOrigin,
+        destination: window.selectedDestination,
+        travelMode: google.maps.TravelMode[currentTravelMode] // ★ここを動的に変更
+    }, (response, status) => {
+        if (status === "OK") {
+            directionsRenderer.setDirections(response);
+            
+            // 標高計算へ（電車や車の場合はダメージを減らすロジックに飛ばす）
+            const path = response.routes[0].overview_path;
+            const elevator = new google.maps.ElevationService();
+            elevator.getElevationForLocations({ locations: path }, (results, status) => {
+                if (status === "OK") {
+                    let totalAscent = 0;
+                    for (let i = 1; i < results.length; i++) {
+                        const diff = results[i].elevation - results[i-1].elevation;
+                        if (diff > 0) totalAscent += diff;
+                    }
+                    applyDamage(totalAscent, type, currentTravelMode); // ★モードを渡す
+                }
+            });
+        }
+    });
+}
+
+// ダメージ計算をモード別に調整
+function applyDamage(ascent, type, mode) {
+    const hpFill = document.getElementById("hp-bar-fill");
+    const hpText = document.getElementById("hp-text");
+    
+    let baseDamage = Math.floor(ascent * 3);
+    
+    // ★交通手段によるボーナス（電車や車は坂道のダメージをほぼ無視！）
+    if (mode === 'TRANSIT') baseDamage = Math.floor(baseDamage * 0.1); 
+    if (mode === 'DRIVING') baseDamage = Math.floor(baseDamage * 0.05);
+    
+    if (type === 'warp') baseDamage = Math.floor(baseDamage * 0.2);
+
+    let remainingHP = 100 - baseDamage;
+    if (remainingHP < 0) remainingHP = 0;
+
+    hpFill.style.width = remainingHP + "%";
+    hpText.innerText = `残りHP: ${remainingHP} / 100`;
+    hpFill.style.background = remainingHP < 30 ? "#ef4444" : "#10b981";
+}  
+	   let map, directionsService, directionsRenderer, originAutocomplete, destinationAutocomplete;
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
