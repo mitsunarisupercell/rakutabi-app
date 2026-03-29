@@ -1,142 +1,157 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <title>楽旅ナビ - 比較シミュレーター</title>
-    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>楽旅ナビ - 標高・ルート比較</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=places,geometry&callback=initMap" async defer></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background-color: #f0fdf4; padding-bottom: 50px; }
-        #header { background: linear-gradient(135deg, #2563eb, #10b981); color: white; padding: 15px; text-align: center; sticky: top; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
+        #map { width: 100%; height: 350px; background: #ddd; }
         
-        /* HPゲージのデザイン */
-        #hp-container { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 10px; margin-top: 10px; }
-        #hp-bar-bg { background-color: #eee; border-radius: 8px; height: 20px; width: 100%; position: relative; overflow: hidden; }
-        #hp-bar-fill { background: #10b981; height: 100%; width: 100%; transition: width 1.5s cubic-bezier(0.1, 0, 0.3, 1); }
-        #hp-text { position: absolute; width: 100%; text-align: center; top: 0; font-weight: bold; line-height: 20px; font-size: 12px; }
+        .input-container {
+            padding: 15px; background: white; margin: 10px; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; z-index: 1000;
+        }
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 12px; font-weight: bold; color: #666; margin-bottom: 4px; }
+        .input-group input {
+            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;
+            box-sizing: border-box; font-size: 16px; outline: none;
+        }
+        .input-group input:focus { border-color: #4a90e2; }
 
-        #map { height: 300px; width: 100%; border-bottom: 2px solid #ccc; }
-        
-        /* 比較カードのスタイル */
-        .comparison-container { display: flex; gap: 10px; padding: 15px; overflow-x: auto; }
-        .route-card { background: white; border-radius: 15px; padding: 15px; min-width: 200px; flex: 1; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 2px solid transparent; transition: 0.3s; }
-        .route-card.training { border-color: #ef4444; } /* 修行：赤 */
-        .route-card.warp { border-color: #10b981; }     /* ワープ：緑 */
-        
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: bold; margin-bottom: 8px; }
-        .badge-red { background: #fee2e2; color: #991b1b; }
-        .badge-green { background: #d1fae5; color: #065f46; }
+        .comparison-container { padding: 10px; display: flex; justify-content: space-between; gap: 10px; }
+        .btn {
+            flex: 1; padding: 15px; border: none; border-radius: 10px; color: white;
+            font-weight: bold; font-size: 16px; cursor: pointer; transition: opacity 0.2s;
+        }
+        .btn-training { background: #ef4444; }
+        .btn-warp { background: #10b981; }
+        .btn:active { opacity: 0.7; }
 
-        h4 { margin: 5px 0; font-size: 16px; }
-        .price { font-size: 14px; color: #666; }
-        .btn-select { width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; }
-        .btn-red { background: #ef4444; }
-        .btn-green { background: #10b981; }
+        .hp-card {
+            background: white; margin: 10px; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center;
+        }
+        .hp-bar { width: 100%; height: 24px; background: #eee; border-radius: 12px; overflow: hidden; margin: 10px 0; border: 2px solid #333; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #10b981; transition: width 0.8s ease-in-out, background 0.5s; }
+        #hp-text { font-size: 18px; font-weight: bold; margin: 0; }
+        #elevation-info { font-size: 14px; color: #666; margin-top: 5px; }
     </style>
 </head>
-<<body>
-    <div id="header">
-    </div>
-	<div style="padding: 15px; background: white; margin: 10px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; z-index: 1000;">
-		<p style="margin: 0 0 5px 0; font-weight: bold; font-size: 14px; color: #333;">🛫 出発地を入力</p>
-		<input id="origin-input" type="text" placeholder="例：横浜駅" 
-			   style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 15px;">
-	
-		<p style="margin: 0 0 5px 0; font-weight: bold; font-size: 14px; color: #333;">📍 目的地を入力</p>
-		<input id="destination-input" type="text" placeholder="例：横浜スタジアム" 
-			   style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px;">
-	</div>
-<div id="map"></div>
+<body>
 
-        <div id="header">
-            </div> 
-<div id="header">
-    <h2 style="margin:0;">楽旅ナビ 🗺️</h2>
-    <div id="hp-container">
-        <div id="hp-bar-bg">
-            <div id="hp-bar-fill"></div>
-            <div id="hp-text">現在地での体力: 100 / 100</div>
+    <div id="map"></div>
+
+    <div class="input-container">
+        <div class="input-group">
+            <label>🛫 出発地</label>
+            <input id="origin-input" type="text" placeholder="例：横浜駅">
+        </div>
+        <div class="input-group">
+            <label>📍 目的地</label>
+            <input id="destination-input" type="text" placeholder="例：フェリス女学院">
         </div>
     </div>
-</div>
 
-    <div class="route-card warp">
-        <span class="badge badge-green">神ワープ</span>
-        <p style="font-size:12px; color:#666;"></p>
-        <button onclick="calculateAndDisplayRoute('training')" style="...">修行ルート</button>
-<button onclick="calculateAndDisplayRoute('warp')" style="...">神ワープ</button>
+    <div class="comparison-container">
+        <button class="btn btn-training" onclick="calculateAndDisplayRoute('training')">修行ルート</button>
+        <button class="btn btn-warp" onclick="calculateAndDisplayRoute('warp')">神ワープ</button>
     </div>
-</div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=places&callback=initMap" async defer></script>
+    <div class="hp-card">
+        <p id="hp-text">現在のHP: 100 / 100</p>
+        <div class="hp-bar"><div id="hp-bar-fill"></div></div>
+        <div id="elevation-info">ルートを選択してください</div>
+    </div>
 
-<script>
-  function calculateAndDisplayRoute(type) {
-    if (!window.selectedOrigin || !window.selectedDestination) {
-        alert("出発地と目的地を選択してください");
-        return;
-    }
+    <script>
+        let map, directionsService, directionsRenderer, originAutocomplete, destinationAutocomplete;
 
-    directionsService.route(
-        {
-            origin: window.selectedOrigin,
-            destination: window.selectedDestination,
-            travelMode: google.maps.TravelMode.WALKING
-        },
-        (response, status) => {
-            if (status === "OK") {
-                directionsRenderer.setDirections(response);
-                
-                // ★ここから追加：標高（高さ）を調べる
-                const path = response.routes[0].overview_path;
-                const elevator = new google.maps.ElevationService();
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 35.4432, lng: 139.6400 },
+                zoom: 15,
+                disableDefaultUI: true
+            });
 
-                elevator.getElevationForLocations({
-                    locations: path
-                }, (results, status) => {
-                    if (status === "OK") {
-                        // ルート内の「登り坂」の合計を計算する
-                        let totalAscent = 0;
-                        for (let i = 1; i < results.length; i++) {
-                            const diff = results[i].elevation - results[i-1].elevation;
-                            if (diff > 0) totalAscent += diff; // 上がった分だけ足す
-                        }
-                        
-                        // 標高データをもとにHPを減らす
-                        applyRealHPDamage(totalAscent, type);
-                    }
-                });
-            }
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+
+            // 出発地の自動補完
+            originAutocomplete = new google.maps.places.Autocomplete(document.getElementById("origin-input"));
+            originAutocomplete.addListener("place_changed", () => {
+                const place = originAutocomplete.getPlace();
+                if (place.geometry) {
+                    window.selectedOrigin = place.geometry.location;
+                    map.panTo(place.geometry.location);
+                }
+            });
+
+            // 目的地の自動補完
+            destinationAutocomplete = new google.maps.places.Autocomplete(document.getElementById("destination-input"));
+            destinationAutocomplete.addListener("place_changed", () => {
+                const place = destinationAutocomplete.getPlace();
+                if (place.geometry) {
+                    window.selectedDestination = place.geometry.location;
+                    map.panTo(place.geometry.location);
+                }
+            });
         }
-    );
-}
 
-// 実際のダメージを計算して表示する関数
-function applyRealHPDamage(ascent, type) {
-    const hpFill = document.getElementById("hp-bar-fill");
-    const hpText = document.getElementById("hp-text");
-    
-    // 基本のダメージ（距離など） + 坂道のボーナスダメージ
-    let damage = Math.floor(ascent * 5); // 1m登るごとに5ダメージ（調整可）
-    
-    // 「神ワープ」ならダメージを半分にする（仮のロジック）
-    if (type === 'warp') {
-        damage = Math.floor(damage * 0.3); 
-    }
+        function calculateAndDisplayRoute(type) {
+            if (!window.selectedOrigin || !window.selectedDestination) {
+                alert("出発地と目的地を検索して選択してください！");
+                return;
+            }
 
-    let remainingHP = 100 - damage;
-    if (remainingHP < 0) remainingHP = 0;
+            directionsService.route({
+                origin: window.selectedOrigin,
+                destination: window.selectedDestination,
+                travelMode: google.maps.TravelMode.WALKING
+            }, (response, status) => {
+                if (status === "OK") {
+                    directionsRenderer.setDirections(response);
+                    
+                    // 標高データの取得
+                    const path = response.routes[0].overview_path;
+                    const elevator = new google.maps.ElevationService();
+                    elevator.getElevationForLocations({ locations: path }, (results, status) => {
+                        if (status === "OK") {
+                            let totalAscent = 0;
+                            for (let i = 1; i < results.length; i++) {
+                                const diff = results[i].elevation - results[i-1].elevation;
+                                if (diff > 0) totalAscent += diff;
+                            }
+                            applyDamage(totalAscent, type);
+                        }
+                    });
+                } else {
+                    alert("ルートが見つかりませんでした。");
+                }
+            });
+        }
 
-    // アニメーションで反映
-    hpFill.style.width = remainingHP + "%";
-    hpText.innerText = `合計登り: ${Math.round(ascent)}m / 到着時のHP: ${remainingHP}`;
-    
-    if (remainingHP < 30) {
-        hpFill.style.background = "#ef4444"; // ピンチなら赤
-    } else {
-        hpFill.style.background = "#10b981"; // 元気なら緑
-    }
-}
-</script>
+        function applyDamage(ascent, type) {
+            const hpFill = document.getElementById("hp-bar-fill");
+            const hpText = document.getElementById("hp-text");
+            const info = document.getElementById("elevation-info");
 
+            // ダメージ計算（1m登るごとに3ダメージ、神ワープは1/5に軽減）
+            let damage = Math.floor(ascent * 3);
+            if (type === 'warp') damage = Math.floor(damage * 0.2);
+
+            let remainingHP = 100 - damage;
+            if (remainingHP < 0) remainingHP = 0;
+
+            hpFill.style.width = remainingHP + "%";
+            hpText.innerText = `残りHP: ${remainingHP} / 100`;
+            info.innerText = `総上昇距離: 約 ${Math.round(ascent)}m (${type === 'training' ? '修行' : '回避'}モード)`;
+            
+            hpFill.style.background = remainingHP < 30 ? "#ef4444" : "#10b981";
+        }
+    </script>
 </body>
 </html>
