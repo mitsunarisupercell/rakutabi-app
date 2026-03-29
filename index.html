@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>楽旅ナビ - 究極のルート比較</title>
+    <title>楽旅ナビ - 最適ルート検索</title>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=places,geometry&callback=initMap" async defer></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
@@ -20,7 +20,6 @@
             box-sizing: border-box; font-size: 16px; background: #fafafa;
         }
 
-        /* 交通手段セレクター */
         .mode-selector {
             display: flex; justify-content: space-around; margin-top: 10px;
             padding-top: 10px; border-top: 1px solid #eee;
@@ -79,7 +78,7 @@
     <div class="hp-card">
         <p id="hp-text">HP: 100 / 100</p>
         <div class="hp-bar"><div id="hp-bar-fill"></div></div>
-        <div id="status-msg">ルートを選択して出発！</div>
+        <div id="status-msg">ルートを解析して最適な道を探します</div>
     </div>
 
     <script>
@@ -90,14 +89,12 @@
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 35.4432, lng: 139.6400 },
                 zoom: 14,
-                disableDefaultUI: true,
-                styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+                disableDefaultUI: true
             });
 
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers: false });
+            directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
 
-            // オートコンプリート設定
             const opt = { types: ['geocode', 'establishment'] };
             const authOrigin = new google.maps.places.Autocomplete(document.getElementById("origin-input"), opt);
             const authDest = new google.maps.places.Autocomplete(document.getElementById("destination-input"), opt);
@@ -112,38 +109,66 @@
             document.getElementById('mode-' + mode).classList.add('active');
         }
 
+        // ルート検索の開始
         function go(type) {
             if (!originPlace || !destinationPlace) {
-                alert("出発地と目的地をリストから選んでください！");
+                alert("出発地と目的地を選択してください");
                 return;
             }
 
             directionsService.route({
                 origin: originPlace,
                 destination: destinationPlace,
-                travelMode: google.maps.TravelMode[currentMode]
-            }, (res, status) => {
+                travelMode: google.maps.TravelMode[currentMode],
+                provideRouteAlternatives: true // 複数ルートを取得
+            }, async (res, status) => {
                 if (status === "OK") {
-                    directionsRenderer.setDirections(res);
-                    analyzeElevation(res.routes[0].overview_path, type);
+                    document.getElementById("status-msg").innerText = "全ルートの勾配を計算中...";
+                    await findBestHPRoute(res, type);
                 } else {
                     alert("ルートが見つかりませんでした");
                 }
             });
         }
 
-        function analyzeElevation(path, type) {
+        // 全ルートの中から最も「楽」な道を探す
+        async function findBestHPRoute(response, type) {
             const elevator = new google.maps.ElevationService();
-            elevator.getElevationForLocations({ locations: path }, (results, status) => {
-                if (status === "OK") {
-                    let ascent = 0;
-                    for (let i = 1; i < results.length; i++) {
-                        const diff = results[i].elevation - results[i-1].elevation;
-                        if (diff > 0) ascent += diff;
+            let bestRouteIndex = 0;
+            let minAscent = Infinity;
+
+            for (let i = 0; i < response.routes.length; i++) {
+                const path = response.routes[i].overview_path;
+                const ascent = await new Promise((resolve) => {
+                    elevator.getElevationForLocations({ locations: path }, (results, status) => {
+                        let currentAscent = 0;
+                        if (status === "OK") {
+                            for (let j = 1; j < results.length; j++) {
+                                const diff = results[j].elevation - results[j-1].elevation;
+                                if (diff > 0) currentAscent += diff;
+                            }
+                        }
+                        resolve(currentAscent);
+                    });
+                });
+
+                // 修行なら「よりキツイ道」、ワープなら「より楽な道」を選ぶ
+                if (type === 'training') {
+                    if (ascent > (minAscent === Infinity ? -1 : minAscent)) {
+                        minAscent = ascent;
+                        bestRouteIndex = i;
                     }
-                    renderResult(ascent, type);
+                } else {
+                    if (ascent < minAscent) {
+                        minAscent = ascent;
+                        bestRouteIndex = i;
+                    }
                 }
-            });
+            }
+
+            directionsRenderer.setRouteIndex(bestRouteIndex);
+            directionsRenderer.setDirections(response);
+            renderResult(minAscent, type);
         }
 
         function renderResult(ascent, type) {
@@ -151,18 +176,18 @@
             const hpText = document.getElementById("hp-text");
             const msg = document.getElementById("status-msg");
 
-            // ダメージロジック: 標高1m = 3ダメ。交通手段で軽減。
             let damage = ascent * 3;
             if (currentMode === 'TRANSIT') damage *= 0.15;
             if (currentMode === 'DRIVING') damage *= 0.05;
             if (type === 'warp') damage *= 0.2;
 
             let resultHP = Math.max(0, Math.floor(100 - damage));
-
             hpFill.style.width = resultHP + "%";
             hpText.innerText = `HP: ${resultHP} / 100`;
             hpFill.style.background = resultHP < 30 ? "#ff416c" : "#11998e";
-            msg.innerText = `総上昇負荷量: 約${Math.round(ascent)}m (${currentMode}利用)`;
+            
+            const modeText = type === 'training' ? '【修行】あえて険しい道' : '【神ワープ】最も平坦な道';
+            msg.innerText = `${modeText}を選択！ (上昇: 約${Math.round(ascent)}m)`;
         }
     </script>
 </body>
