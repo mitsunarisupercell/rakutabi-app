@@ -3,60 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>楽旅ナビ - 標高・ルート比較</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDe-LKFTRBL_F0y1YrTBPRqNZtae64BUjk&libraries=places,geometry&callback=initMap" async defer></script>
+    <title>楽旅ナビ - 究極のルート比較</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places,geometry&callback=initMap" async defer></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-        #map { width: 100%; height: 350px; background: #ddd; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f4f7f6; color: #333; }
+        #map { width: 100%; height: 300px; background: #ddd; }
         
         .input-container {
-            padding: 15px; background: white; margin: 10px; border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; z-index: 1000;
-			<div style="display: flex; justify-content: space-around; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
-    <label style="text-align: center; cursor: pointer;">
-        <input type="radio" name="travel-mode" value="WALKING" checked style="display: none;">
-        <div class="mode-icon" onclick="selectMode(this, 'WALKING')">🚶‍♂️<br><span style="font-size: 10px;">徒歩</span></div>
-    </label>
-    <label style="text-align: center; cursor: pointer;">
-        <input type="radio" name="travel-mode" value="TRANSIT" style="display: none;">
-        <div class="mode-icon" onclick="selectMode(this, 'TRANSIT')" style="opacity: 0.5;">🚃<br><span style="font-size: 10px;">電車</span></div>
-    </label>
-    <label style="text-align: center; cursor: pointer;">
-        <input type="radio" name="travel-mode" value="DRIVING" style="display: none;">
-        <div class="mode-icon" onclick="selectMode(this, 'DRIVING')" style="opacity: 0.5;">🚗<br><span style="font-size: 10px;">車</span></div>
-    </label>
-</div>
-
-<style>
-    .mode-icon { padding: 5px 10px; border-radius: 8px; transition: all 0.3s; }
-    .mode-active { background: #e0f2fe; border: 1px solid #4a90e2; opacity: 1 !important; transform: scale(1.1); }
-</style>
+            padding: 15px; background: white; margin: 10px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; z-index: 1000;
         }
-        .input-group { margin-bottom: 12px; }
-        .input-group label { display: block; font-size: 12px; font-weight: bold; color: #666; margin-bottom: 4px; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 11px; font-weight: bold; color: #888; margin-bottom: 2px; }
         .input-group input {
-            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;
-            box-sizing: border-box; font-size: 16px; outline: none;
+            width: 100%; padding: 10px; border: 1px solid #eee; border-radius: 8px;
+            box-sizing: border-box; font-size: 16px; background: #fafafa;
         }
-        .input-group input:focus { border-color: #4a90e2; }
 
-        .comparison-container { padding: 10px; display: flex; justify-content: space-between; gap: 10px; }
-        .btn {
-            flex: 1; padding: 15px; border: none; border-radius: 10px; color: white;
-            font-weight: bold; font-size: 16px; cursor: pointer; transition: opacity 0.2s;
+        /* 交通手段セレクター */
+        .mode-selector {
+            display: flex; justify-content: space-around; margin-top: 10px;
+            padding-top: 10px; border-top: 1px solid #eee;
         }
-        .btn-training { background: #ef4444; }
-        .btn-warp { background: #10b981; }
-        .btn:active { opacity: 0.7; }
+        .mode-btn {
+            text-align: center; cursor: pointer; padding: 8px; border-radius: 10px;
+            flex: 1; transition: all 0.2s; opacity: 0.4; filter: grayscale(1);
+        }
+        .mode-btn.active { opacity: 1; filter: grayscale(0); background: #eef6ff; transform: scale(1.05); }
+        .mode-btn span { font-size: 10px; font-weight: bold; display: block; }
+
+        .action-container { padding: 0 10px; display: flex; gap: 10px; }
+        .btn {
+            flex: 1; padding: 14px; border: none; border-radius: 12px; color: white;
+            font-weight: bold; font-size: 15px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn-training { background: linear-gradient(135deg, #ff416c, #ff4b2b); }
+        .btn-warp { background: linear-gradient(135deg, #11998e, #38ef7d); }
 
         .hp-card {
-            background: white; margin: 10px; padding: 15px; border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center;
+            background: white; margin: 15px 10px; padding: 20px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;
         }
-        .hp-bar { width: 100%; height: 24px; background: #eee; border-radius: 12px; overflow: hidden; margin: 10px 0; border: 2px solid #333; }
-        #hp-bar-fill { width: 100%; height: 100%; background: #10b981; transition: width 0.8s ease-in-out, background 0.5s; }
-        #hp-text { font-size: 18px; font-weight: bold; margin: 0; }
-        #elevation-info { font-size: 14px; color: #666; margin-top: 5px; }
+        .hp-bar { width: 100%; height: 28px; background: #eee; border-radius: 14px; overflow: hidden; margin: 15px 0; border: 2px solid #2c3e50; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #10b981; transition: width 1s ease-out, background 0.5s; }
+        #hp-text { font-size: 20px; font-weight: bold; margin: 0; color: #2c3e50; }
+        #status-msg { font-size: 13px; color: #7f8c8d; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -65,173 +56,113 @@
 
     <div class="input-container">
         <div class="input-group">
-            <label>🛫 出発地</label>
-            <input id="origin-input" type="text" placeholder="例：横浜駅">
+            <label>🛫 START</label>
+            <input id="origin-input" type="text" placeholder="出発地を入力...">
         </div>
         <div class="input-group">
-            <label>📍 目的地</label>
-            <input id="destination-input" type="text" placeholder="例：フェリス女学院">
+            <label>📍 GOAL</label>
+            <input id="destination-input" type="text" placeholder="目的地を入力...">
+        </div>
+
+        <div class="mode-selector">
+            <div class="mode-btn active" id="mode-WALKING" onclick="setMode('WALKING')">🚶‍♂️<span>徒歩</span></div>
+            <div class="mode-btn" id="mode-TRANSIT" onclick="setMode('TRANSIT')">🚃<span>電車</span></div>
+            <div class="mode-btn" id="mode-DRIVING" onclick="setMode('DRIVING')">🚗<span>車</span></div>
         </div>
     </div>
 
-    <div class="comparison-container">
-        <button class="btn btn-training" onclick="calculateAndDisplayRoute('training')">修行ルート</button>
-        <button class="btn btn-warp" onclick="calculateAndDisplayRoute('warp')">神ワープ</button>
+    <div class="action-container">
+        <button class="btn btn-training" onclick="go('training')">修行ルート</button>
+        <button class="btn btn-warp" onclick="go('warp')">神ワープ</button>
     </div>
 
     <div class="hp-card">
-        <p id="hp-text">現在のHP: 100 / 100</p>
+        <p id="hp-text">HP: 100 / 100</p>
         <div class="hp-bar"><div id="hp-bar-fill"></div></div>
-        <div id="elevation-info">ルートを選択してください</div>
+        <div id="status-msg">ルートを選択して出発！</div>
     </div>
 
     <script>
-     // スクリプトの最初の方に追加
-let currentTravelMode = 'WALKING';
-
-// アイコンを選択した時の見た目の切り替え
-function selectMode(element, mode) {
-    document.querySelectorAll('.mode-icon').forEach(el => el.classList.remove('mode-active'));
-    element.classList.add('mode-active');
-    currentTravelMode = mode;
-}
-
-// calculateAndDisplayRoute関数の中を修正
-function calculateAndDisplayRoute(type) {
-    if (!window.selectedOrigin || !window.selectedDestination) {
-        alert("出発地と目的地を選択してください");
-        return;
-    }
-
-    directionsService.route({
-        origin: window.selectedOrigin,
-        destination: window.selectedDestination,
-        travelMode: google.maps.TravelMode[currentTravelMode] // ★ここを動的に変更
-    }, (response, status) => {
-        if (status === "OK") {
-            directionsRenderer.setDirections(response);
-            
-            // 標高計算へ（電車や車の場合はダメージを減らすロジックに飛ばす）
-            const path = response.routes[0].overview_path;
-            const elevator = new google.maps.ElevationService();
-            elevator.getElevationForLocations({ locations: path }, (results, status) => {
-                if (status === "OK") {
-                    let totalAscent = 0;
-                    for (let i = 1; i < results.length; i++) {
-                        const diff = results[i].elevation - results[i-1].elevation;
-                        if (diff > 0) totalAscent += diff;
-                    }
-                    applyDamage(totalAscent, type, currentTravelMode); // ★モードを渡す
-                }
-            });
-        }
-    });
-}
-
-// ダメージ計算をモード別に調整
-function applyDamage(ascent, type, mode) {
-    const hpFill = document.getElementById("hp-bar-fill");
-    const hpText = document.getElementById("hp-text");
-    
-    let baseDamage = Math.floor(ascent * 3);
-    
-    // ★交通手段によるボーナス（電車や車は坂道のダメージをほぼ無視！）
-    if (mode === 'TRANSIT') baseDamage = Math.floor(baseDamage * 0.1); 
-    if (mode === 'DRIVING') baseDamage = Math.floor(baseDamage * 0.05);
-    
-    if (type === 'warp') baseDamage = Math.floor(baseDamage * 0.2);
-
-    let remainingHP = 100 - baseDamage;
-    if (remainingHP < 0) remainingHP = 0;
-
-    hpFill.style.width = remainingHP + "%";
-    hpText.innerText = `残りHP: ${remainingHP} / 100`;
-    hpFill.style.background = remainingHP < 30 ? "#ef4444" : "#10b981";
-}  
-	   let map, directionsService, directionsRenderer, originAutocomplete, destinationAutocomplete;
+        let map, directionsService, directionsRenderer, currentMode = 'WALKING';
+        let originPlace, destinationPlace;
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 35.4432, lng: 139.6400 },
-                zoom: 15,
-                disableDefaultUI: true
+                zoom: 14,
+                disableDefaultUI: true,
+                styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
             });
 
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer();
-            directionsRenderer.setMap(map);
+            directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers: false });
 
-            // 出発地の自動補完
-            originAutocomplete = new google.maps.places.Autocomplete(document.getElementById("origin-input"));
-            originAutocomplete.addListener("place_changed", () => {
-                const place = originAutocomplete.getPlace();
-                if (place.geometry) {
-                    window.selectedOrigin = place.geometry.location;
-                    map.panTo(place.geometry.location);
-                }
-            });
+            // オートコンプリート設定
+            const opt = { types: ['geocode', 'establishment'] };
+            const authOrigin = new google.maps.places.Autocomplete(document.getElementById("origin-input"), opt);
+            const authDest = new google.maps.places.Autocomplete(document.getElementById("destination-input"), opt);
 
-            // 目的地の自動補完
-            destinationAutocomplete = new google.maps.places.Autocomplete(document.getElementById("destination-input"));
-            destinationAutocomplete.addListener("place_changed", () => {
-                const place = destinationAutocomplete.getPlace();
-                if (place.geometry) {
-                    window.selectedDestination = place.geometry.location;
-                    map.panTo(place.geometry.location);
-                }
-            });
+            authOrigin.addListener("place_changed", () => { originPlace = authOrigin.getPlace().geometry?.location; });
+            authDest.addListener("place_changed", () => { destinationPlace = authDest.getPlace().geometry?.location; });
         }
 
-        function calculateAndDisplayRoute(type) {
-            if (!window.selectedOrigin || !window.selectedDestination) {
-                alert("出発地と目的地を検索して選択してください！");
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('mode-' + mode).classList.add('active');
+        }
+
+        function go(type) {
+            if (!originPlace || !destinationPlace) {
+                alert("出発地と目的地をリストから選んでください！");
                 return;
             }
 
             directionsService.route({
-                origin: window.selectedOrigin,
-                destination: window.selectedDestination,
-                travelMode: google.maps.TravelMode.WALKING
-            }, (response, status) => {
+                origin: originPlace,
+                destination: destinationPlace,
+                travelMode: google.maps.TravelMode[currentMode]
+            }, (res, status) => {
                 if (status === "OK") {
-                    directionsRenderer.setDirections(response);
-                    
-                    // 標高データの取得
-                    const path = response.routes[0].overview_path;
-                    const elevator = new google.maps.ElevationService();
-                    elevator.getElevationForLocations({ locations: path }, (results, status) => {
-                        if (status === "OK") {
-                            let totalAscent = 0;
-                            for (let i = 1; i < results.length; i++) {
-                                const diff = results[i].elevation - results[i-1].elevation;
-                                if (diff > 0) totalAscent += diff;
-                            }
-                            applyDamage(totalAscent, type);
-                        }
-                    });
+                    directionsRenderer.setDirections(res);
+                    analyzeElevation(res.routes[0].overview_path, type);
                 } else {
-                    alert("ルートが見つかりませんでした。");
+                    alert("ルートが見つかりませんでした");
                 }
             });
         }
 
-        function applyDamage(ascent, type) {
+        function analyzeElevation(path, type) {
+            const elevator = new google.maps.ElevationService();
+            elevator.getElevationForLocations({ locations: path }, (results, status) => {
+                if (status === "OK") {
+                    let ascent = 0;
+                    for (let i = 1; i < results.length; i++) {
+                        const diff = results[i].elevation - results[i-1].elevation;
+                        if (diff > 0) ascent += diff;
+                    }
+                    renderResult(ascent, type);
+                }
+            });
+        }
+
+        function renderResult(ascent, type) {
             const hpFill = document.getElementById("hp-bar-fill");
             const hpText = document.getElementById("hp-text");
-            const info = document.getElementById("elevation-info");
+            const msg = document.getElementById("status-msg");
 
-            // ダメージ計算（1m登るごとに3ダメージ、神ワープは1/5に軽減）
-            let damage = Math.floor(ascent * 3);
-            if (type === 'warp') damage = Math.floor(damage * 0.2);
+            // ダメージロジック: 標高1m = 3ダメ。交通手段で軽減。
+            let damage = ascent * 3;
+            if (currentMode === 'TRANSIT') damage *= 0.15;
+            if (currentMode === 'DRIVING') damage *= 0.05;
+            if (type === 'warp') damage *= 0.2;
 
-            let remainingHP = 100 - damage;
-            if (remainingHP < 0) remainingHP = 0;
+            let resultHP = Math.max(0, Math.floor(100 - damage));
 
-            hpFill.style.width = remainingHP + "%";
-            hpText.innerText = `残りHP: ${remainingHP} / 100`;
-            info.innerText = `総上昇距離: 約 ${Math.round(ascent)}m (${type === 'training' ? '修行' : '回避'}モード)`;
-            
-            hpFill.style.background = remainingHP < 30 ? "#ef4444" : "#10b981";
+            hpFill.style.width = resultHP + "%";
+            hpText.innerText = `HP: ${resultHP} / 100`;
+            hpFill.style.background = resultHP < 30 ? "#ff416c" : "#11998e";
+            msg.innerText = `総上昇負荷量: 約${Math.round(ascent)}m (${currentMode}利用)`;
         }
     </script>
 </body>
